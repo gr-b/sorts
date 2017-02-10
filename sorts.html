@@ -1,0 +1,436 @@
+<html>
+<head>
+<!-- Sorting algorithm visualization by Griffin Bishop -->
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+
+<!-- jQuery library -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+
+<!-- Latest compiled JavaScript -->
+<script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+<script src="logic.js"></script>
+</head>
+<body style="background-color: #003366">
+	<nav id="upper_nav" class="navbar navbar-inverse">
+		<div class="container-fluid">
+					<ul class="nav nav-pills">
+						<li><p class="navbar-brand">Sorting algorithms</p></li>
+						<li><a id="randbutton">Randomize(scroll)</a></li>
+						<li><a id="staircase">Staircase</a></li>
+						<li><a id="revstaircase">Reverse Staircase</a></li>
+						<li><a id="options">Show Options</a></li>
+						<li><a id="autoSort">Auto Sort: On</a></li>
+						<li id="algsDrop" role="presentation" class="dropdown">
+									<a class="dropdown-toggle" data-toggle="dropdown">
+										Algorithm: 
+									<span class="caret"></span></button>
+									<ul class="dropdown-menu">
+										<li>
+											<a href="#" id="bubble">Bubblesort</a>
+										</li>
+										<li>
+											<a href="#" id="insertion">Insertionsort</a>
+										</li>
+								</ul>
+						</li>
+						
+						<li id="eltsDrop" role="presentation" class="dropdown">
+								<a id="numEltsButton" class="dropdown-toggle" data-toggle="dropdown">
+									Number of Elements: 20
+								<span class="caret"></span></a>
+								<ul class="dropdown-menu">
+									<li><!--<h3 id="numEltsDisp">20</h3>--><input type="range" id="numElts" min="1" max="100" value="20"></li>
+									<li>
+										<!-- <h3>Size:</h3>-->
+										<!--<input type="range" id="myRange" min="0" max="35" value="35"> -->
+										<!--<h3 id="graphSize">15</h1> -->
+									</li>
+								</ul>
+						</li>
+						
+						<li id="delayDrop" role="presentation" class="dropdown">
+								<a id="delayDropButton" class="dropdown-toggle" data-toggle="dropdown">
+									Delay: 1ms
+								<span class="caret"></span></a>
+								<ul class="dropdown-menu">
+									<li><input type="range" id="delayRange" min="1" max="500" value="500"></li>
+								</ul>
+						</li>
+						
+					</ul>
+		</div>
+	</nav>
+
+	
+	<canvas id="canvas" width="500" height="500">
+	</canvas>
+	<script>
+	var LOWER_BOUND = 0;
+	var UPPER_BOUND = 100;
+	var NUM_ELTS = 20;
+	var sort_this_array = [];
+	var selection = [];
+	var already_bubbled = 1;
+	var current_alg = 0;
+	var current_alg_name = 'Bubblesort';
+	var delay = 0.1;
+	var autosort = true;
+	var comps = 0;
+	var swaps = 0;
+	
+	var GRAPH_COLOR = "#0066ff";
+	var BGCOLOR = "#003366";
+	var TEXTCOLOR = "#66ff33";
+	var HOVERCOLOR = "#ff6600";
+	var HOVERTEXTCOLOR = "#ff531a";
+	var COMPARE_COLOR = "red";
+	
+	var MAX_NUM_SIZE = 50;
+	
+	var GRAPH_PERCENT_FROM_EDGES = 0.05;
+	
+	// Initialize these variables.
+	var graph_height = 0;
+	var graph_width = 0;
+	
+	var graph_top_y = 0;
+	var graph_bottom_y = 0;
+	
+	var graph_left_x = 0;
+	var graph_right_x = 0;
+	
+	var graph;
+	//// End init vars ////
+	
+	// Canvas initialization
+	var canvas = document.getElementById("canvas");
+	canvas.height = window.innerHeight;
+	canvas.width = window.innerWidth;
+	
+	var ctx = canvas.getContext("2d");
+	initCanvas();
+	
+	// JQUERY stuff
+	$(document).ready(function(){
+		$('#algsDrop').hide();
+		$('#eltsDrop').hide();
+		$('#delayDrop').hide();
+		$('#autoSort').hide();
+		sort_this_array = randArray(NUM_ELTS, LOWER_BOUND, UPPER_BOUND);
+		drawArray(sort_this_array);
+		
+		$('#bubble').click(function(){
+			selection = [0]; // Reset selection
+			current_alg = 0; // 0 is bubblesort.
+			current_alg_name = 'Bubblesort';
+		});
+		
+		$('#insertion').click(function(){
+			selection = [0]; // Reset selection
+			already_bubbled
+			current_alg = 1;
+			current_alg_name = 'Insertionsort';
+		});
+		
+		$('#staircase').click(function(){
+			reset();
+			staircase();
+		});
+		
+		$('#revstaircase').click(function(){
+			var step = Math.round((UPPER_BOUND-LOWER_BOUND)/sort_this_array.length);
+			for(var i=0;i<sort_this_array.length;i++){
+				sort_this_array[sort_this_array.length-1-i] = (i+1)*step;
+			}
+			reset();
+			autoSort();
+		});
+		
+		$('#autoSort').click(function(){
+			if(autosort){
+				autosort = false;
+				$('#autoSort').html('Auto Sort: Off');
+			} else {
+				autosort = true;
+				$('#autoSort').html('Auto Sort: On');
+			}
+			
+			/*if(current_alg == 0){
+				autoSort();
+			}*/
+		});
+		
+		$('#options').click(function(){
+			algsDrop = $('#algsDrop');
+			eltsDrop = $('#eltsDrop');
+			
+			algsDrop.toggle();
+			eltsDrop.toggle();
+			$('#delayDrop').toggle();
+			$('#autoSort').toggle();
+		});
+		
+		$('#delayRange').on('input change', function(){
+				delay = this.value;
+				$('#delayDropButton').html('Delay: ' + delay + 'ms <span class="caret"></span>');
+		});
+	
+		$('#myRange').on('input change', function(){
+				var sizeVal = 40 - this.value;
+				GRAPH_PERCENT_FROM_EDGES = sizeVal * 0.01;
+				$('#graphSize').text(sizeVal);
+				initCanvas();
+				drawArray(sort_this_array);
+		});
+		
+		$('#numElts').on('input change', function(){
+			NUM_ELTS = this.value;
+			$('#numEltsButton').html('Number of Elements: ' + NUM_ELTS + ' <span class="caret"></span>');
+			$('#numEltsDisp').text(this.value);
+			initCanvas();
+			sort_this_array = randArray(NUM_ELTS, LOWER_BOUND, UPPER_BOUND);
+			drawArray(sort_this_array);
+		});
+		
+		$( window ).resize(function(){
+			initCanvas();
+			drawArray(sort_this_array);
+		});
+	
+		$("#randbutton").click(function(){
+			randomize();
+		});
+		
+		$( window ).bind('mousewheel', function(e){
+			if(e.originalEvent.wheelDelta / 120 > 0) {
+				//if(NUM_ELTS < 200){
+				//NUM_ELTS += 1;}
+			} else {
+				//if(NUM_ELTS > 1){
+				//NUM_ELTS += -1;}
+			}
+			randomize();
+		});
+		
+		$('#canvas').click(function(){
+			doCurrentAlg();
+		});
+		
+		$( window ).mousemove(function(e){
+			window.mouseXPos = e.pageX;
+			window.mouseYPos = e.pageY;
+			checkHoverOverCell();
+		});
+	});
+	
+	function reset(){
+		swaps = 0;
+		comps = 0;
+		already_bubbled = 1;
+		selection = [0];
+	}
+	
+	
+	// Does one step of the current algorithm
+	function doCurrentAlg(){
+		if(current_alg == 0){
+			bubblesort();
+		} else if(current_alg == 1){
+			insertionsort();
+		}	
+	}
+	
+	// Draws the current number of swaps and comparisons
+	function drawInfo(){
+			ctx.fillStyle = "rgba(0, 153, 255,0.3)";
+			ctx.font = "20px Times New Roman";
+			ctx.fillText("Comparisons: " + comps + "   Swaps: " + swaps,
+				graph.left_x, graph.top_y);
+				
+			ctx.fillStyle = "rgba(0, 153, 255,0.1)";
+			var fsize = getMaxFontSize()*4;
+			ctx.font = fsize+"px Times New Roman";
+			ctx.fillText(current_alg_name, centerText(current_alg_name, canvas.width/2), 
+				graph.bottom_y-fsize/2);
+	}
+
+	
+	// Draws the canvas background and inital text
+	function initCanvas(){
+			canvas.height = window.innerHeight*(0.95) - document.getElementById("upper_nav").clientHeight;
+			canvas.width = window.innerWidth;
+			ctx.fillStyle = BGCOLOR;
+			ctx.fillRect(0, 0, canvas.width, canvas.height);
+	}
+	
+	// Draw the given array 
+	function drawArray(arr){
+			calcGraphLocations(); // Recalculate graph positions.
+			MAX_NUM_SIZE = getMaxFontSize();
+			drawInfo();
+			
+			// Calculate cell width
+			var cellWidth = calcCellWidth(arr);
+			
+			// Draw each of the cells
+			for(var i=0;i<arr.length;i++){
+				// Get the x position for the cell
+				var cellX = i*cellWidth + graph.left_x;
+				drawCell(arr[i], cellX, cellWidth, GRAPH_COLOR);
+			}
+			//drawOutline();
+			// Now draw the selected items:
+			for(var i=0;i<selection.length;i++){
+					highlightCell(selection[i]);
+			}
+	}
+	
+	// Highlights the given cell index.
+	function highlightCell(i){
+		var highlightedNum = sort_this_array[i];
+		var cellWidth = calcCellWidth(sort_this_array);
+		var cellX = getCellX(i, cellWidth);
+		
+		drawCell(highlightedNum, cellX, cellWidth, HOVERCOLOR);
+	}
+	
+	// Draws an outline around the current graph position
+	function drawOutline(){
+			ctx.strokeStyle = GRAPH_COLOR;
+			ctx.strokeRect(graph.left_x, graph.top_y, graph.width, graph.height);
+	}
+	
+	// Puts a randomized staircase into the sorting array.
+	function staircase(){
+			var step = Math.round((UPPER_BOUND-LOWER_BOUND)/sort_this_array.length);
+			for(var i=0;i<sort_this_array.length;i++){
+				sort_this_array[i] = (i+1)*step;
+			}
+			randSwitch(0);	
+	}
+	
+	// switches two random places in the array
+	function randSwitch(i){
+		if(i<sort_this_array.length){
+			clear();
+			drawArray(sort_this_array);
+			var first = Math.round(Math.random() * sort_this_array.length);
+			var second = Math.round(Math.random() * sort_this_array.length);
+			if(first > 0 && first < sort_this_array.length &&
+				second > 0 && second < sort_this_array.length){
+				
+				swapTwo(sort_this_array, first, second);
+			}
+			i++;
+			window.setTimeout(function(){ randSwitch(i); }, delay);
+		} else {
+			already_bubbled = 1;
+			selection = [0];
+			autoSort();
+			swaps = 0;
+			comps = 0;
+		}
+	}
+	
+	// Auto sorts the array.
+	function autoSort(){
+		if(already_bubbled == sort_this_array.length){
+				window.clearTimeout(timeNum);
+				return;
+		}
+		// If we're not done sorting,
+		timeNum = window.setTimeout(autoSort, delay);
+		doCurrentAlg();
+	}
+	
+	// Sort the function showing the steps taken.
+	function bubblesort(){
+		clear();
+		drawArray(sort_this_array);
+		bubbleStep();
+	}
+	
+	// Does one step of the bubblesort algorithm. 
+	// In one step: if none red, highlight the two being compared in red.
+	// If two are already red, swap them.
+	// Given the array to sort, and an array with the indices of the selected elements.
+	function bubbleStep(){
+		// If there are already two red, check them and then swap.
+		if(selection.length < 1){
+			selection = [0];
+			return;
+		} 
+		if(selection.length == 2){
+				var first = selection[0];
+				var second = selection[1];
+				if(sort_this_array[first]>sort_this_array[second]){
+					swapTwo(sort_this_array, first, second);
+					swaps++;
+				}
+				selection = [second];
+				return;
+		}
+		// If we only have one selected,
+		if(selection.length == 1){
+				// Select the next one in the array to compared
+				if(selection[0] < sort_this_array.length-already_bubbled){
+					selection = [selection[0], selection[0]+1];
+					comps++;
+				} else {
+					selection = [0];
+					already_bubbled++;
+				}
+				return;
+		}
+	}
+	
+	// Sort the function showing the steps taken.
+	function insertionsort(){
+		clear();
+		drawArray(sort_this_array);
+		insertionStep();
+	}
+	
+	
+	// Does one stop of the insertion sort algorithm.
+	function insertionStep(){
+		if(selection[0] == sort_this_array.length){
+			already_bubbled = selection[0];
+			return;
+		}
+		// first selection is where we are in the array.
+		// second is the element we're sorting into the sorted.
+		// third element is the element we're comparing
+		if(selection.length < 2){
+			selection = [0, 0, 0];
+			return;
+		}
+		if(selection.length == 2){
+			if(selection[1] > 0){
+				selection[2] = selection[1]-1;
+			} else {
+				selection[0]++;
+				selection[1] = selection[0];
+			}
+			return;
+		}
+		
+		if(selection.length == 3){
+			var first = selection[1]; // These indices are actually right
+			var second = selection[2]; 
+			if(sort_this_array[first]<sort_this_array[second]){
+				swapTwo(sort_this_array, selection[1], selection[2]);
+				swaps++;
+			}
+			selection = [selection[0], selection[2]];
+			comps++;
+		}
+	}
+	
+	function clear() {
+	ctx.clearRect(0,0,canvas.width,canvas.height);
+	}
+	</script>
+</body>
+</html>
